@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api")
-public class StatusCheckService {
+public class StatusController {
 
     @Autowired
     private MongoTemplate mongoTemplate;

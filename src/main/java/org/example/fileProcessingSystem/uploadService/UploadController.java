@@ -1,49 +1,52 @@
 package org.example.fileProcessingSystem.uploadService;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import org.example.fileProcessingSystem.common.StatusService;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
-@RestController
-@RequestMapping("/api")
+@Controller
 public class UploadController {
 
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
+    // Чтение пути к директории из настроек
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
-    @Autowired
-    private StatusService statusService;
-
-    private static final long MAX_FILE_SIZE = 10485760; // 10 MB
-    private static final String ALLOWED_FILE_TYPE = "text/plain";
+    @GetMapping("/upload")
+    public String listUploadedFiles(Model model) {
+        return "uploadForm";
+    }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
-        String fileName = file.getOriginalFilename();
-
-        // Первичная валидация типа файла
-        if (!file.getContentType().equals(ALLOWED_FILE_TYPE)) {
-            statusService.updateStatus(fileName, "Failed primary validation: Invalid file type");
-            return ResponseEntity.badRequest().body("Invalid file type");
+    public String handleFileUpload(@RequestParam("file") MultipartFile file,
+                                   RedirectAttributes redirectAttributes) {
+        if (file.isEmpty()) {
+            redirectAttributes.addFlashAttribute("message", "Please select a file to upload");
+            return "redirect:upload";
         }
 
-        // Первичная валидация размера файла
-        if (file.getSize() > MAX_FILE_SIZE) {
-            statusService.updateStatus(fileName, "Failed primary validation: File too large");
-            return ResponseEntity.badRequest().body("File size exceeds the maximum limit");
+        try {
+            // Сохранение файла на диск
+            byte[] bytes = file.getBytes();
+            Path path = Paths.get(uploadDir + "/" + file.getOriginalFilename());
+            Files.write(path, bytes);
+
+            redirectAttributes.addFlashAttribute("message",
+                    "You successfully uploaded '" + file.getOriginalFilename() + "'");
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        // Отправка сообщения в Kafka
-        kafkaTemplate.send("file-topic", fileName);
-
-        // Запись статуса в MongoDB
-        statusService.updateStatus(fileName, "File uploaded and passed primary validation");
-
-        return ResponseEntity.ok("File uploaded successfully");
+        return "redirect:/upload";
     }
 }

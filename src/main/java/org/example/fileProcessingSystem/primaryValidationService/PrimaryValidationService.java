@@ -1,38 +1,24 @@
 package org.example.fileProcessingSystem.primaryValidationService;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.example.fileProcessingSystem.primaryValidationService.PrimaryValidationObject.PrimaryValidationRequest;
+import org.example.fileProcessingSystem.primaryValidationService.PrimaryValidationObject.PrimaryValidationResponse;
 import org.springframework.stereotype.Service;
-import org.example.fileProcessingSystem.common.StatusService;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @Service
 public class PrimaryValidationService {
 
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Autowired
-    private StatusService statusService;
-
-    @KafkaListener(topics = "file-topic", groupId = "primary-validation-group")
-    public void listen(String fileName) {
-        // Логика первичной валидации (например, проверка формата имени файла)
-        boolean isValid = performPrimaryValidation(fileName);
-
-        if (isValid) {
-            // Отправка сообщения в Kafka о результате валидации
-            kafkaTemplate.send("validation-topic", fileName);
-            // Обновление статуса в MongoDB
-            statusService.updateStatus(fileName, "Passed primary validation");
-        } else {
-            // Обновление статуса в MongoDB
-            statusService.updateStatus(fileName, "Failed primary validation");
+    @PostMapping("/validate")
+    public PrimaryValidationResponse validateFile(@RequestBody PrimaryValidationRequest request) {
+        if (request.getFileSize() > 2 * 1024 * 1024) { // 2 MB size limit
+            return new PrimaryValidationResponse(false, "File size exceeds the limit of 2 MB");
         }
-    }
 
-    private boolean performPrimaryValidation(String fileName) {
-        // Пример логики валидации: файл должен иметь расширение .txt
-        return fileName != null && fileName.endsWith(".txt");
+        if (!request.getFileType().equals("text/plain")) { // Only allow plain text files
+            return new PrimaryValidationResponse(false, "Only plain text files are allowed");
+        }
+
+        return new PrimaryValidationResponse(true, "File is valid");
     }
 }

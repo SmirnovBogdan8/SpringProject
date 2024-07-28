@@ -1,4 +1,4 @@
-package org.example.fileProcessingSystem.statusCheckService;
+package org.example.fileProcessingSystem.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;

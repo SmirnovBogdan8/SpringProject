@@ -1,14 +1,12 @@
-package org.example.fileProcessingSystem.uploadService;
+package org.example.fileProcessingSystem.controller;
 
-import org.example.fileProcessingSystem.uploadService.PrimaryValidationObject.PrimaryValidationRequest;
-import org.example.fileProcessingSystem.uploadService.PrimaryValidationObject.PrimaryValidationResponse;
+import org.example.fileProcessingSystem.service.PrimaryValidationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -20,8 +18,14 @@ import java.nio.file.Paths;
 @Controller
 public class UploadController {
 
-    @Value("${primary.validation.url}")
-    private String primaryValidationUrl;
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
+    private final PrimaryValidationService primaryValidationService;
+
+    public UploadController(PrimaryValidationService primaryValidationService) {
+        this.primaryValidationService = primaryValidationService;
+    }
 
     @GetMapping("/upload")
     public String listUploadedFiles(Model model) {
@@ -36,16 +40,25 @@ public class UploadController {
             return "redirect:/upload";
         }
 
-        RestTemplate restTemplate = new RestTemplate();
-        PrimaryValidationRequest request = new PrimaryValidationRequest(file.getOriginalFilename(), file.getSize(), file.getContentType());
-        PrimaryValidationResponse response = restTemplate.postForObject(primaryValidationUrl, request, PrimaryValidationResponse.class);
+        try {
+            String validationMessage = primaryValidationService.validateFile(file);
+            if (validationMessage != null) {
+                redirectAttributes.addFlashAttribute("message", "Validation failed: " + validationMessage);
+                return "redirect:/upload";
+            }
 
-        if (response.isValid()) {
+            // Сохраняем файл, если валидация прошла успешно
+            byte[] bytes = file.getBytes();
+            Path path = Paths.get(uploadDir + "/" + file.getOriginalFilename());
+            Files.write(path, bytes);
+
             redirectAttributes.addFlashAttribute("message",
-                    "File '" + file.getOriginalFilename() + "' uploaded successfully: " + response.getMessage());
-        } else {
+                    "You successfully uploaded '" + file.getOriginalFilename() + "'");
+
+        } catch (IOException e) {
+            e.printStackTrace();
             redirectAttributes.addFlashAttribute("message",
-                    "File '" + file.getOriginalFilename() + "' validation failed: " + response.getMessage());
+                    "An error occurred while uploading the file: " + e.getMessage());
         }
 
         return "redirect:/upload";

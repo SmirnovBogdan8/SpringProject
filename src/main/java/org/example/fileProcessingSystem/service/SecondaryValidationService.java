@@ -1,4 +1,4 @@
-package org.example.fileProcessingSystem.secondaryValidationService;
+package org.example.fileProcessingSystem.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
